@@ -4,20 +4,47 @@
         <label for="node-input-name"><i class="fa fa-tag"></i> <span data-i18n="common.label.name"></span></label>
         <input type="text" id="node-input-name" data-i18n="[placeholder]common.label.name">
     </div>
-    <div class="form-row" style="margin-bottom: 0px;">
-        <label for="node-input-func"><i class="fa fa-wrench"></i> <span data-i18n="function.label.function"></span></label>
-        <input type="hidden" id="node-input-func" autofocus="autofocus">
-        <input type="hidden" id="node-input-noerr">
-    </div>
-    <div class="form-row node-text-editor-row" style="position:relative">
-        <div style="position: absolute; right:0; bottom:calc(100% + 3px);"><button id="node-function-expand-js" class="editor-button editor-button-small"><i class="fa fa-expand"></i></button></div>
-        <div style="height: 250px; min-height:150px;" class="node-text-editor" id="node-input-func-editor" ></div>
-    </div>
     <div class="form-row">
-        <label for="node-input-outputs"><i class="fa fa-random"></i> <span data-i18n="function.label.outputs"></span></label>
-        <input id="node-input-outputs" style="width: 60px;" value="1">
+        <ul style="background: #fff;" id="function-node-tabs"></ul> 
     </div>
-    <div class="form-tips"><span data-i18n="function.tip"></span></div>
+
+    <div id="function-node-tabs-content">
+
+        <div id="function-node-tab-code" style="display:none">
+            <div class="form-row" style="margin-bottom: 0px;">
+                <label for="node-input-func"><i class="fa fa-wrench"></i> <span data-i18n="function.label.function"></span></label>
+                <input type="hidden" id="node-input-func" autofocus="autofocus">
+                <input type="hidden" id="node-input-noerr">
+            </div>
+            <div class="form-row node-text-editor-row" style="position:relative">
+                <div style="position: absolute; right:0; bottom:calc(100% + 3px);"><button id="node-function-expand-js" class="editor-button editor-button-small"><i class="fa fa-expand"></i></button></div>
+                <div style="height: 250px; min-height:150px;" class="node-text-editor" id="node-input-func-editor" ></div>
+            </div>
+            <div class="form-row">
+                <label for="node-input-outputs"><i class="fa fa-random"></i> <span data-i18n="function.label.outputs"></span></label>
+                <input id="node-input-outputs" style="width: 60px;" value="1">
+            </div>
+            <div class="form-tips"><span data-i18n="function.tip"></span></div>
+        </div>
+
+    <div id="function-node-tab-params" style="display:none">
+            <div class="form-row">
+                <input type="hidden" id="node-input-params">
+            </div>
+            <div class="form-row params-container-row">
+                <ol id="params-container"></ol>
+            </div>
+            <div class="form-row params-input-container-row">
+            </div>
+            <div class="form-row">
+                <label for="node-input-params-mode"><span>Edit Mode:</span></label>
+                <select id="node-input-params-mode">
+                    <option value="edit">Edit Parameter</option>
+                    <option value="input">Input Parameter</option>
+                </select>
+            </div>
+        </div>
+    </div>
 </script>
 
 <script type="text/x-red" data-help-name="function">
@@ -69,7 +96,8 @@
             name: {value:""},
             func: {value:"\nreturn msg;"},
             outputs: {value:1},
-            noerr: {value:0,required:true,validate:function(v) { return ((!v) || (v === 0)) ? true : false; }}
+            noerr: {value:0,required:true,validate:function(v) { return ((!v) || (v === 0)) ? true : false; }},
+            params: []
         },
         inputs:1,
         outputs:1,
@@ -82,60 +110,150 @@
         },
         oneditprepare: function() {
             var that = this;
-            $( "#node-input-outputs" ).spinner({
-                min:1,
-                change: function(event, ui) {
-                    var value = this.value;
-                    if (!value.match(/^\d+$/)) { value = 1;  }
-                    else if (value < this.min) { value = this.min; }
-                    if (value !== this.value) { $(this).spinner("value", value); }
-                }
-            });
 
-            this.editor = RED.editor.createEditor({
-                id: 'node-input-func-editor',
-                mode: 'ace/mode/javascript',
-                value: $("#node-input-func").val(),
-                globals: {
-                    msg:true,
-                    context:true,
-                    RED: true,
-                    util: true,
-                    flow: true,
-                    global: true,
-                    console: true,
-                    Buffer: true,
-                    setTimeout: true,
-                    clearTimeout: true,
-                    setInterval: true,
-                    clearInterval: true
-                }
-            });
-
-            RED.library.create({
-                url:"functions", // where to get the data from
-                type:"function", // the type of object the library is for
-                editor:this.editor, // the field name the main text body goes to
-                mode:"ace/mode/javascript",
-                fields:['name','outputs']
-            });
-            this.editor.focus();
-
-            $("#node-function-expand-js").click(function(e) {
-                e.preventDefault();
-                var value = that.editor.getValue();
-                RED.editor.editJavaScript({
-                    value: value,
-                    cursor: that.editor.getCursorPosition(),
-                    complete: function(v,cursor) {
-                        that.editor.setValue(v, -1);
-                        that.editor.gotoLine(cursor.row+1,cursor.column,false);
-                        setTimeout(function() {
-                            that.editor.focus();
-                        },300);
+            function setupTabs() {
+                var tabs = RED.tabs.create({
+                    id: "function-node-tabs",
+                    onchange: function(tab) {
+                        $("#function-node-tabs-content").children().hide();
+                        $("#" + tab.id).show();
                     }
-                })
-            })
+                });
+                tabs.addTab({
+                    id: "function-node-tab-code",
+                    label: "Code"
+                });
+                tabs.addTab({
+                    id: "function-node-tab-params",
+                    label: "Parameters"
+                });
+            } // setupTabs
+
+            function setupCodeTab() {
+                $( "#node-input-outputs" ).spinner({
+                    min:1,
+                    change: function(event, ui) {
+                        var value = this.value;
+                        if (!value.match(/^\d+$/)) { value = 1;  }
+                        else if (value < this.min) { value = this.min; }
+                        if (value !== this.value) { $(this).spinner("value", value); }
+                    }
+                });
+
+                that.editor = RED.editor.createEditor({
+                    id: 'node-input-func-editor',
+                    mode: 'ace/mode/javascript',
+                    value: $("#node-input-func").val(),
+                    globals: {
+                        msg:true,
+                        context:true,
+                        RED: true,
+                        util: true,
+                        flow: true,
+                        global: true,
+                        console: true,
+                        Buffer: true,
+                        setTimeout: true,
+                        clearTimeout: true,
+                        setInterval: true,
+                        clearInterval: true
+                    }
+                });
+
+                RED.library.create({
+                    url:"functions", // where to get the data from
+                    type:"function", // the type of object the library is for
+                    editor:that.editor, // the field name the main text body goes to
+                    mode:"ace/mode/javascript",
+                    fields:['name','outputs']
+                });
+                that.editor.focus();
+
+                $("#node-function-expand-js").click(function(e) {
+                    e.preventDefault();
+                    var value = that.editor.getValue();
+                    RED.editor.editJavaScript({
+                        value: value,
+                        cursor: that.editor.getCursorPosition(),
+                        complete: function(v,cursor) {
+                            that.editor.setValue(v, -1);
+                            that.editor.gotoLine(cursor.row+1,cursor.column,false);
+                            setTimeout(function() {
+                                that.editor.focus();
+                            },300);
+                        }
+                    })
+                });
+            } // setupCodeTab
+
+            function setupParamsTab() {
+                var checkboxType = {
+                    value: "checkbox",
+                    label: "checkbox",
+                    icon: "fa fa-check-square-o",
+                    hasValue: false
+                };
+                var buttonType = {
+                    value: "button",
+                    label: "button",
+                    icon: "fa fa-hand-pointer-o",
+                    hasValue: false
+                };
+                var menuType = {
+                    value: "menu",
+                    label: "menu",
+                    icon: "fa fa-list",
+                    hasValue: false
+                };
+                var noValueType = {
+                    value: "none",
+                    label: "no value",
+                    hasValue: false
+                };
+                $("#params-container")
+                    .css('min-height','250px')
+                    .css('min-width','400px')
+                    .editableList({
+                        addItem: function(container,i,opt) {
+                            var row = $('<div/>').appendTo(container);
+                            var labelField = $('<input/>',{
+                                class: "params-label",
+                                type: "text",
+                                style: "width:37%; margine-left:5px;",
+                                placeholder: "name"
+                            }).appendTo(row);
+                            var valueField = $('<input/>',{
+                                class: "params-value",
+                                type: "text",
+                                style: "width:60%; margin-left:5px;"
+                            }).appendTo(row)
+                                .typedInput({
+                                    default: 'str',
+                                    types: ['str', 'num', 'bool', 'date', 're',
+                                            'json', 'bin', 'jsonata', 'env',
+                                            checkboxType,
+                                            buttonType,
+                                            menuType,
+                                            noValueType
+                                           ]
+                                });
+                        },
+                        removeItem: function(opt) {
+                        },
+                        removable: true
+                    });
+
+                console.log("; that:", that);
+                var container = $("#params-container");
+                for (var i = 0; i < that.params.length; i++) {
+                    var param = that.params[i];
+                    container.editableList('addItem', {});
+                }
+            } // setupParamsTab
+
+            setupTabs();
+            setupCodeTab();
+            setupParamsTab();
         },
         oneditsave: function() {
             var annot = this.editor.getSession().getAnnotations();
