@@ -27,15 +27,21 @@
             <div class="form-tips"><span data-i18n="function.tip"></span></div>
         </div>
 
-    <div id="function-node-tab-params" style="display:none">
+        <div id="function-node-tab-params" style="display:none">
             <div class="form-row">
                 <input type="hidden" id="node-input-params">
             </div>
-            <div class="form-row params-container-row">
-                <ol id="params-container"></ol>
+
+            <div class="node-row-params-edit">
+                <div class="form-row params-edit-container-row">
+                    <ol id="params-edit-container"></ol>
+                </div>
             </div>
-            <div class="form-row params-input-container-row">
+
+            <div class="node-row-params-input">
+                <div class="form-row" id="params-input-container"/>
             </div>
+
             <div class="form-row">
                 <label for="node-input-display-mode"><span>Edit Mode:</span></label>
                 <select id="node-input-display-mode">
@@ -43,6 +49,7 @@
                     <option value="input">Input Parameter</option>
                 </select>
             </div>
+
         </div>
     </div>
 </script>
@@ -211,7 +218,7 @@
                     label: "no value",
                     hasValue: false
                 };
-                $("#params-container")
+                $("#params-edit-container")
                     .css('min-height','250px')
                     .css('min-width','400px')
                     .editableList({
@@ -244,18 +251,68 @@
                         removable: true
                     });
 
+                function setupUI() {
+                    var container = $("#params-input-container");
+                    var rules = $("#params-edit-container").editableList('items');
+                    container.empty();
+                    rules.each(function (i) {
+                        var label = $(this).find(".params-label").val();
+                        var ti = $(this).find(".params-value");
+                        var type = ti.typedInput("type");
+                        var value = ti.typedInput("value");
+                        var row = $("<div/>", {class:"form-row"}).appendTo(container);
+                        var labelField = $("<label/>").html(label).appendTo(row);
+			if ((type === 'str') || (type === 'num') ||
+			    (type === 'bool') || (type === 'date') ||
+			    (type === 're') || (type === 'json') ||
+			    (type === 'bin') || (type === 'jsonata') ||
+			    (type === 'env')
+			   ) {
+                            var valueField = $("<input/>", {type: "text"})
+				.appendTo(row)
+				.typedInput({
+				    default: type,
+				    types: [ type ]
+				});
+			    valueField.typedInput('value', value);
+			}
+			else if (type === 'checkbox') {
+                            var valueField = $("<input/>", {type: "checkbox"})
+				.appendTo(row)
+			    valueField.prop('checked', value);
+			}
+			else if (type === 'button') {
+			}
+			else if (type === 'menu') {
+			}
+			else if (type === 'none') {
+			    // nothing to do
+			}
+			else {
+			    throw new Error("unexpected field type");
+			}
+                    });
+                }
+
                 console.log("; that:", that);
-                var container = $("#params-container");
+                var container = $("#params-edit-container");
                 for (var i = 0; i < that.params.length; i++) {
                     var param = that.params[i];
-                    container.editableList('addItem', {});
+                    container.editableList('addItem', {
+                        type: param.type,
+                        value: param.value
+                    });
                 }
                 $("#node-input-display-mode").change(function () {
                     var val = $(this).val();
-                    console.log("; change:", val);
-                    $(".params-conainer-row").toggle(val === "edit");
-                    $(".params-input-container-row").toggle(val === "input");
+		    var is_input = (val === "input");
+                    $(".node-row-params-edit").toggle(val === "edit");
+                    $(".node-row-params-input").toggle(is_input);
+                    if (is_input) {
+                        setupUI();
+                    }
                 });
+                $("#node-input-display-mode").change();
             } // setupParamsTab
 
             setupTabs();
