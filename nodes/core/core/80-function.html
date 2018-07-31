@@ -37,8 +37,8 @@
             <div class="form-row params-input-container-row">
             </div>
             <div class="form-row">
-                <label for="node-input-params-mode"><span>Edit Mode:</span></label>
-                <select id="node-input-params-mode">
+                <label for="node-input-display-mode"><span>Edit Mode:</span></label>
+                <select id="node-input-display-mode">
                     <option value="edit">Edit Parameter</option>
                     <option value="input">Input Parameter</option>
                 </select>
@@ -97,7 +97,8 @@
             func: {value:"\nreturn msg;"},
             outputs: {value:1},
             noerr: {value:0,required:true,validate:function(v) { return ((!v) || (v === 0)) ? true : false; }},
-            params: []
+            displayMode: {value: "edit"},
+            params: {value: []}
         },
         inputs:1,
         outputs:1,
@@ -249,6 +250,12 @@
                     var param = that.params[i];
                     container.editableList('addItem', {});
                 }
+                $("#node-input-display-mode").change(function () {
+                    var val = $(this).val();
+                    console.log("; change:", val);
+                    $(".params-conainer-row").toggle(val === "edit");
+                    $(".params-input-container-row").toggle(val === "input");
+                });
             } // setupParamsTab
 
             setupTabs();
