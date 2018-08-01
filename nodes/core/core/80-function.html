@@ -27,30 +27,20 @@
             <div class="form-tips"><span data-i18n="function.tip"></span></div>
         </div>
 
-        <div id="function-node-tab-params" style="display:none">
-            <div class="form-row">
-                <input type="hidden" id="node-input-params">
-            </div>
-
+        <div id="function-node-tab-edit-params" style="display:none">
             <div class="node-row-params-edit">
                 <div class="form-row params-edit-container-row">
                     <ol id="params-edit-container"></ol>
                 </div>
             </div>
+        </div>
 
-            <div class="node-row-params-input">
+        <div id="function-node-tab-input-params" style="display:none">
+            <div class="for-row node-row-params-input">
                 <div class="form-row" id="params-input-container"/>
             </div>
-
-            <div class="form-row">
-                <label for="node-input-display-mode"><span>Edit Mode:</span></label>
-                <select id="node-input-display-mode">
-                    <option value="edit">Edit Parameter</option>
-                    <option value="input">Input Parameter</option>
-                </select>
-            </div>
-
         </div>
+
     </div>
 </script>
 
@@ -105,7 +95,8 @@
             outputs: {value:1},
             noerr: {value:0,required:true,validate:function(v) { return ((!v) || (v === 0)) ? true : false; }},
             displayMode: {value: "edit"},
-            params: {value: []}
+            params: {value: []},
+	    active_tab: {value: "function-node-tab-code"}
         },
         inputs:1,
         outputs:1,
@@ -119,12 +110,73 @@
         oneditprepare: function() {
             var that = this;
 
+            function setupInputUI() {
+                var container = $("#params-input-container");
+                var rules = $("#params-edit-container").editableList('items');
+                container.empty();
+                rules.each(function (i) {
+                    var label = $(this).find(".params-label").val();
+                    var ti = $(this).find(".params-value");
+                    var type = ti.typedInput("type");
+                    var value = ti.typedInput("value");
+                    var row = $("<div/>", {
+			class: "form-row",
+			f_label: label,
+			f_type: type,
+			f_value: value
+		    }).appendTo(container);
+                    var labelField = $("<label/>", {
+			style: "width: 25%; padding-left: 10px;"
+		    }).html(label).appendTo(row);
+		    if ((type === 'str') || (type === 'num') ||
+			(type === 'bool') || (type === 'date') ||
+			(type === 're') || (type === 'json') ||
+			(type === 'bin') || (type === 'jsonata') ||
+			(type === 'env')
+		       ) {
+                        var valueField = $("<input/>", {
+			    type: "text",
+			    style: "width: 70%;"
+			})
+			    .appendTo(row)
+			    .typedInput({
+				default: type,
+				types: [ type ]
+			    });
+			valueField.typedInput("value", value);
+			valueField.on("change", function (e, t) {
+			    var new_val = valueField.typedInput("value");
+			    ti.typedInput("value", new_val);
+			});
+		    }
+		    else if (type === 'checkbox') {
+                        var valueField = $("<input/>", {type: "checkbox"})
+			    .appendTo(row)
+			valueField.prop("checked", value);
+		    }
+		    else if (type === 'button') {
+		    }
+		    else if (type === 'menu') {
+		    }
+		    else if (type === 'label') {
+			// nothing to do
+		    }
+		    else {
+			throw new Error("unexpected field type");
+		    }
+                });
+	    }
+	    
             function setupTabs() {
                 var tabs = RED.tabs.create({
                     id: "function-node-tabs",
                     onchange: function(tab) {
+			if (tab.id === 'function-node-tab-input-params') {
+			    setupInputUI();
+			}
                         $("#function-node-tabs-content").children().hide();
                         $("#" + tab.id).show();
+			that.active_tab = tab.id;
                     }
                 });
                 tabs.addTab({
@@ -132,8 +184,12 @@
                     label: "Code"
                 });
                 tabs.addTab({
-                    id: "function-node-tab-params",
-                    label: "Parameters"
+                    id: "function-node-tab-edit-params",
+                    label: "Edit Parameters"
+                });
+                tabs.addTab({
+                    id: "function-node-tab-input-params",
+                    label: "Input Parameters"
                 });
             } // setupTabs
 
@@ -213,9 +269,10 @@
                     icon: "fa fa-list",
                     hasValue: false
                 };
-                var noValueType = {
-                    value: "none",
-                    label: "no value",
+                var labelType = {
+                    value: "label",
+                    label: "label",
+		    icon: "fa fa-tag",
                     hasValue: false
                 };
                 $("#params-edit-container")
@@ -230,89 +287,49 @@
                                 style: "width:37%; margine-left:5px;",
                                 placeholder: "name"
                             }).appendTo(row);
-                            var valueField = $('<input/>',{
+			    if (opt && opt.label) {
+				labelField.val(opt.label);
+			    }
+			    var type =
+				(opt && opt.hasOwnProperty("type")) ? opt.type : "str";
+                            var valueField = $('<input/>', {
                                 class: "params-value",
                                 type: "text",
                                 style: "width:60%; margin-left:5px;"
                             }).appendTo(row)
                                 .typedInput({
-                                    default: 'str',
+                                    default: type,
                                     types: ['str', 'num', 'bool', 'date', 're',
                                             'json', 'bin', 'jsonata', 'env',
                                             checkboxType,
                                             buttonType,
                                             menuType,
-                                            noValueType
+                                            labelType
                                            ]
                                 });
+			    if (opt && opt.value) {
+				valueField.val(opt.value);
+			    }
                         },
                         removeItem: function(opt) {
                         },
-                        removable: true
+                        removable: true,
+			sortable: true
                     });
 
-                function setupUI() {
-                    var container = $("#params-input-container");
-                    var rules = $("#params-edit-container").editableList('items');
-                    container.empty();
-                    rules.each(function (i) {
-                        var label = $(this).find(".params-label").val();
-                        var ti = $(this).find(".params-value");
-                        var type = ti.typedInput("type");
-                        var value = ti.typedInput("value");
-                        var row = $("<div/>", {class:"form-row"}).appendTo(container);
-                        var labelField = $("<label/>").html(label).appendTo(row);
-			if ((type === 'str') || (type === 'num') ||
-			    (type === 'bool') || (type === 'date') ||
-			    (type === 're') || (type === 'json') ||
-			    (type === 'bin') || (type === 'jsonata') ||
-			    (type === 'env')
-			   ) {
-                            var valueField = $("<input/>", {type: "text"})
-				.appendTo(row)
-				.typedInput({
-				    default: type,
-				    types: [ type ]
-				});
-			    valueField.typedInput('value', value);
-			}
-			else if (type === 'checkbox') {
-                            var valueField = $("<input/>", {type: "checkbox"})
-				.appendTo(row)
-			    valueField.prop('checked', value);
-			}
-			else if (type === 'button') {
-			}
-			else if (type === 'menu') {
-			}
-			else if (type === 'none') {
-			    // nothing to do
-			}
-			else {
-			    throw new Error("unexpected field type");
-			}
-                    });
-                }
-
-                console.log("; that:", that);
+		var params = that.params;
+		console.log("; Params:", params);
                 var container = $("#params-edit-container");
-                for (var i = 0; i < that.params.length; i++) {
-                    var param = that.params[i];
+                container.editableList('empty');
+                for (var i = 0; i < params.length; i++) {
+                    var param = params[i];
+		    console.log("; add: ", param);
                     container.editableList('addItem', {
+			label: param.label,
                         type: param.type,
                         value: param.value
                     });
                 }
-                $("#node-input-display-mode").change(function () {
-                    var val = $(this).val();
-		    var is_input = (val === "input");
-                    $(".node-row-params-edit").toggle(val === "edit");
-                    $(".node-row-params-input").toggle(is_input);
-                    if (is_input) {
-                        setupUI();
-                    }
-                });
-                $("#node-input-display-mode").change();
             } // setupParamsTab
 
             setupTabs();
@@ -320,19 +337,36 @@
             setupParamsTab();
         },
         oneditsave: function() {
-            var annot = this.editor.getSession().getAnnotations();
-            this.noerr = 0;
+	    var that = this;
+
+	    function saveParams() {
+		var params = [];
+                var rules = $("#params-edit-container").editableList('items');
+                rules.each(function (i) {
+                    var label = $(this).find(".params-label").val();
+                    var ti = $(this).find(".params-value");
+                    var type = ti.typedInput("type");
+                    var value = ti.typedInput("value");
+		    params.push({index: i, label: label, type: type, value: value});
+		});
+		that.params = params;
+	    } // saveParams
+
+            var annot = that.editor.getSession().getAnnotations();
+            that.noerr = 0;
             $("#node-input-noerr").val(0);
             for (var k=0; k < annot.length; k++) {
                 //console.log(annot[k].type,":",annot[k].text, "on line", annot[k].row);
                 if (annot[k].type === "error") {
                     $("#node-input-noerr").val(annot.length);
-                    this.noerr = annot.length;
+                    that.noerr = annot.length;
                 }
             }
-            $("#node-input-func").val(this.editor.getValue());
-            this.editor.destroy();
-            delete this.editor;
+            $("#node-input-func").val(that.editor.getValue());
+	    saveParams();
+
+            that.editor.destroy();
+            delete that.editor;
         },
         oneditcancel: function() {
             this.editor.destroy();
