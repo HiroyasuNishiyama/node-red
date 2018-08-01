@@ -28,6 +28,8 @@
         </div>
 
         <div id="function-node-tab-edit-params" style="display:none">
+            <input type="hidden" id="node-input-params">
+            <input type="hidden" id="node-input-active_tab">
             <div class="node-row-params-edit">
                 <div class="form-row params-edit-container-row">
                     <ol id="params-edit-container"></ol>
@@ -94,7 +96,6 @@
             func: {value:"\nreturn msg;"},
             outputs: {value:1},
             noerr: {value:0,required:true,validate:function(v) { return ((!v) || (v === 0)) ? true : false; }},
-            displayMode: {value: "edit"},
             params: {value: []},
 	    active_tab: {value: "function-node-tab-code"}
         },
@@ -128,7 +129,9 @@
                     var labelField = $("<label/>", {
 			style: "width: 25%; padding-left: 10px;"
 		    }).html(label).appendTo(row);
-		    if ((type === 'str') || (type === 'num') ||
+		    if ((type === 'msg') ||
+			(type === 'flow') || (type === 'global') ||
+			(type === 'str') || (type === 'num') ||
 			(type === 'bool') || (type === 'date') ||
 			(type === 're') || (type === 'json') ||
 			(type === 'bin') || (type === 'jsonata') ||
@@ -299,7 +302,8 @@
                             }).appendTo(row)
                                 .typedInput({
                                     default: type,
-                                    types: ['str', 'num', 'bool', 'date', 're',
+                                    types: ['msg', 'flow', 'global',
+					    'str', 'num', 'bool', 'date', 're',
                                             'json', 'bin', 'jsonata', 'env',
                                             checkboxType,
                                             buttonType,
@@ -318,12 +322,10 @@
                     });
 
 		var params = that.params;
-		console.log("; Params:", params);
                 var container = $("#params-edit-container");
                 container.editableList('empty');
                 for (var i = 0; i < params.length; i++) {
                     var param = params[i];
-		    console.log("; add: ", param);
                     container.editableList('addItem', {
 			label: param.label,
                         type: param.type,

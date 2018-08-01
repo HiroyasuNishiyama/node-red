@@ -58,13 +58,14 @@ module.exports = function(RED) {
         var node = this;
         this.name = n.name;
         this.func = n.func;
-	console.log("; params:", n.params);
+	this.params = n.params;
         var functionText = "var results = null;"+
                            "results = (function(msg){ "+
                               "var __msgid__ = msg._msgid;"+
                               "var node = {"+
                                  "id:__node__.id,"+
                                  "name:__node__.name,"+
+                                 "params:__node__.params,"+
                                  "log:__node__.log,"+
                                  "error:__node__.error,"+
                                  "warn:__node__.warn,"+
@@ -90,6 +91,7 @@ module.exports = function(RED) {
             __node__: {
                 id: node.id,
                 name: node.name,
+		params: node.params,
                 log: function() {
                     node.log.apply(node, arguments);
                 },
