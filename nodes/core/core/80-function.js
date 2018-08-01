@@ -58,8 +58,7 @@ module.exports = function(RED) {
         var node = this;
         this.name = n.name;
         this.func = n.func;
-        this.params = n.params;
-        console.log("; params:", n.params);
+        this.func_params = n.func_params;
         var functionText = "var results = null;"+
                            "results = (function(msg){ "+
                               "var __msgid__ = msg._msgid;"+
@@ -92,7 +91,7 @@ module.exports = function(RED) {
             __node__: {
                 id: node.id,
                 name: node.name,
-                params: node.params,
+                params: node.func_params,
                 log: function() {
                     node.log.apply(node, arguments);
                 },

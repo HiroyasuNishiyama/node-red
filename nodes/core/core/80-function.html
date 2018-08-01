@@ -28,8 +28,6 @@
         </div>
 
         <div id="function-node-tab-edit-params" style="display:none">
-            <input type="hidden" id="node-input-params">
-            <input type="hidden" id="node-input-active_tab">
             <div class="node-row-params-edit">
                 <div class="form-row params-edit-container-row">
                     <ol id="params-edit-container"></ol>
@@ -96,7 +94,7 @@
             func: {value:"\nreturn msg;"},
             outputs: {value:1},
             noerr: {value:0,required:true,validate:function(v) { return ((!v) || (v === 0)) ? true : false; }},
-            params: {value: []},
+            func_params: {value: []},
             active_tab: {value: "function-node-tab-code"}
         },
         inputs:1,
@@ -321,7 +319,7 @@
                         sortable: true
                     });
 
-                var params = that.params;
+                var params = that.func_params || [];
                 var container = $("#params-edit-container");
                 container.editableList('empty');
                 for (var i = 0; i < params.length; i++) {
@@ -351,7 +349,7 @@
                     var value = ti.typedInput("value");
                     params.push({index: i, label: label, type: type, value: value});
                 });
-                that.params = params;
+                that.func_params = params;
             } // saveParams
 
             var annot = that.editor.getSession().getAnnotations();
