@@ -118,15 +118,10 @@
                     var ti = $(this).find(".params-value");
                     var type = ti.typedInput("type");
                     var value = ti.typedInput("value");
-                    var row = $("<div/>", {
+                    var row0 = $("<div/>", {
                         class: "form-row",
-                        f_label: label,
-                        f_type: type,
-                        f_value: value
+                        style: "padding-left: 20px;"
                     }).appendTo(container);
-                    var labelField = $("<label/>", {
-                        style: "width: 25%; padding-left: 10px;"
-                    }).html(label).appendTo(row);
                     if ((type === 'msg') ||
                         (type === 'flow') || (type === 'global') ||
                         (type === 'str') || (type === 'num') ||
@@ -135,11 +130,14 @@
                         (type === 'bin') || (type === 'jsonata') ||
                         (type === 'env')
                        ) {
+                        var labelField = $("<label/>", {
+                            style: "width: 25%;"
+                        }).html(label).appendTo(row0);
                         var valueField = $("<input/>", {
                             type: "text",
                             style: "width: 70%;"
                         })
-                            .appendTo(row)
+                            .appendTo(row0)
                             .typedInput({
                                 default: type,
                                 types: [ type ]
@@ -151,9 +149,21 @@
                         });
                     }
                     else if (type === 'checkbox') {
-                        var valueField = $("<input/>", {type: "checkbox"})
-                            .appendTo(row)
+                        var valueField = $("<input/>", {
+                            type: "checkbox",
+                            style: "display: inline-block; width: auto; vertical-align: top;"
+                        })
+                            .appendTo(row0)
+                        var labelField = $("<label/>", {
+                            style: "width: auto; margin-left: 10px;"
+                        })
+                            .appendTo(row0);
+                        labelField.html(label);
                         valueField.prop("checked", value);
+                        valueField.on("change", function (e, t) {
+                            var new_val = valueField.typedInput("value");
+                            ti.typedInput("value", new_val);
+                        });
                     }
                     else if (type === 'button') {
                     }
@@ -277,17 +287,39 @@
                     hasValue: false
                 };
                 $("#params-edit-container")
-                    .css('min-height','250px')
-                    .css('min-width','400px')
+                    .css("min-height", "250px")
+                    .css("min-width", "400px")
                     .editableList({
-                        addItem: function(container,i,opt) {
-                            var row = $('<div/>').appendTo(container);
+                        addItem: function (container, i, opt) {
+                            function setupMenuItems(row) {
+                                var container = $("<ol/>").appendTo(row);
+                                container
+                                    .css("min-height", "70px")
+                                    .editableList({
+                                        addItem: function (con, i, opt) {
+                                            var row = $("<div/>").appendTo(con);
+                                            $("<input/>", {
+                                                type: "text",
+                                                style: "width: 95%;"
+                                            }).appendTo(row);
+                                        },
+                                        removeItem: function (opt) {
+                                        },
+                                        removable: true,
+                                        sortable: true
+                                    });
+                            }
+                            var row0 = $("<div/>").appendTo(container);
+                            var row1 = $("<div/>", {
+                                class: "menu-selection-list",
+                                style: "width: 60%; min-height: 100px; margin-top: 10px; margin-left: auto; margin-right: 7px;"
+                            }).appendTo(container);
                             var labelField = $('<input/>',{
                                 class: "params-label",
                                 type: "text",
                                 style: "width:37%; margine-left:5px;",
                                 placeholder: "name"
-                            }).appendTo(row);
+                            }).appendTo(row0);
                             if (opt && opt.label) {
                                 labelField.val(opt.label);
                             }
@@ -297,7 +329,7 @@
                                 class: "params-value",
                                 type: "text",
                                 style: "width:60%; margin-left:5px;"
-                            }).appendTo(row)
+                            }).appendTo(row0)
                                 .typedInput({
                                     default: type,
                                     types: ['msg', 'flow', 'global',
@@ -310,10 +342,11 @@
                                            ]
                                 });
                             if (opt && opt.value) {
-                                valueField.val(opt.value);
+                                valueField.typedInput('value', opt.value);
                             }
+                            setupMenuItems(row1);
                         },
-                        removeItem: function(opt) {
+                        removeItem: function (opt) {
                         },
                         removable: true,
                         sortable: true
