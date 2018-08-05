@@ -1,3 +1,15 @@
+<!--
+  Copyright JS Foundation and other contributors, http://js.foundation
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+  http://www.apache.org/licenses/LICENSE-2.0
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
 
 <script type="text/x-red" data-template-name="function">
     <div class="form-row">
@@ -86,6 +98,56 @@
 </script>
 
 <script type="text/javascript">
+(function () {
+
+    function saveParams(node) {
+        var params = [];
+        var rules = $("#params-edit-container").editableList("items");
+        rules.each(function (i, item) {
+            var label = $(item).find(".params-label").val();
+            var ti = $(item).find(".params-value");
+            var type = ti.typedInput("type");
+            if ((type === "msg") ||
+                (type === "flow") || (type === "global") ||
+                (type === "str") || (type === "num") ||
+                (type === "bool") || (type === "date") ||
+                (type === "re") || (type === "json") ||
+                (type === "bin") || (type === "jsonata") ||
+                (type === "env") ||
+                (type === "checkbox")
+               ) {
+                var value = ti.typedInput("value");
+                params.push({
+                    index: i, label: label,
+                    type: type, value: value, items: undefined
+                });
+            }
+            else if (type === "menu") {
+                var value = ti.typedInput("value");
+                var items = $(item).find(".menu-item-list").editableList("items");
+                var menu_items = [];
+                items.each(function (i, item) {
+                    var item = $(item).find(".menu-item").val();
+                    menu_items.push(item);
+                });
+                params.push({
+                    index: i, label: label,
+                    type: type, value: value, items: menu_items
+                });
+            }
+            else if (type === "label") {
+                params.push({
+                    index: i, label: label,
+                    type: type, value: "", items: undefined 
+                });
+            }
+            else {
+                throw new Error("unexpected field type: "+JSON.stringify(type));
+            }
+        });
+        node.func_params = params;
+    } // saveParams
+    
     RED.nodes.registerType('function',{
         color:"#fdd0a2",
         category: 'function',
@@ -109,15 +171,14 @@
         oneditprepare: function() {
             var that = this;
 
-            function setupInputUI() {
+            function setupInputUI(node) {
+                var params = node.func_params;
                 var container = $("#params-input-container");
-                var rules = $("#params-edit-container").editableList("items");
                 container.empty();
-                rules.each(function (i) {
-                    var label = $(this).find(".params-label").val();
-                    var ti = $(this).find(".params-value");
-                    var type = ti.typedInput("type");
-                    var value = ti.typedInput("value");
+                params.forEach(function (item) {
+                    var label = item.label;
+                    var type = item.type;
+                    var value = item.value;
                     var row0 = $("<div/>", {
                         class: "form-row",
                         style: "padding-left: 20px;"
@@ -145,7 +206,7 @@
                         valueField.typedInput("value", value);
                         valueField.on("change", function (e, t) {
                             var new_val = valueField.typedInput("value");
-                            ti.typedInput("value", new_val);
+                            item.value = new_val;
                         });
                     }
                     else if (type === "checkbox") {
@@ -163,51 +224,105 @@
                         valueField.prop("checked", value);
                         valueField.on("change", function (e, t) {
                             var new_val = valueField.prop("checked");
-                            ti.typedInput("value", new_val);
+                            item.value = new_val;
                         });
                     }
                     else if (type === "menu") {
                         var labelField = $("<label/>", {
                             style: "width: 25%;"
                         }).html(label).appendTo(row0);
-                        var items = $(this).find(".menu-item-list").editableList("items");
+                        var items = item.items;
                         var selector = $("<select/>", {
                             class: "menu-selector"
                         }).appendTo(row0);
-                        items.each(function (i) {
-                            var item = $(this).find(".menu-item").val();
+                        items.forEach(function (val) {
                             $("<option>", {
-                                value: item
-                            }).text(item).appendTo(selector);
+                                value: val
+                            }).text(val).appendTo(selector);
+                        });
+                        selector.change(function () {
+                            var val = selector.val();
+                            item.value = val;
                         });
                         if (value) {
                             selector.val(value);
                         }
-                        selector.change(function () {
-                            var val = selector.val();
-                            ti.typedInput("value", val);
-                        });
+                        selector.change();
                     }
                     else if (type === "label") {
-                        // nothing to do
+                        var labelField = $("<label/>", {
+                        }).html(label).appendTo(row0);
                     }
                     else {
                         throw new Error("unexpected field type");
                     }
                 });
-            }
-            
+            } // setupInputUI
+
+            function loadParams(node) {
+                var rules = $("#params-edit-container").editableList("items");
+                var params = node.func_params;
+                for (var i = 0; i < params.length; i++) {
+                    var param = params[i];
+                    var rule = rules[i];
+                    var type = param.type;
+                    var value = param.value;
+                    var ti = $(rule).find(".params-value");
+                    if ((type === "msg") ||
+                        (type === "flow") || (type === "global") ||
+                        (type === "str") || (type === "num") ||
+                        (type === "bool") || (type === "date") ||
+                        (type === "re") || (type === "json") ||
+                        (type === "bin") || (type === "jsonata") ||
+                        (type === "env")
+                       ) {
+                        ti.typedInput("value", value);
+                    }
+                    else if (type === "checkbox") {
+                        ti.typedInput("value", value);
+                    }
+                    else if (type === "menu") {
+                        ti.typedInput("value", value);
+                    }
+                    else if (type === "label") {
+                        // nothing to do
+                    }
+                    else {
+                        throw new Error("unexpected field type:"+type);
+                    }
+                }
+            } // loadParams
+
             function setupTabs() {
                 var tabs = RED.tabs.create({
                     id: "function-node-tabs",
                     onchange: function(tab) {
+                        if (that.active_tab === "function-node-tab-edit-params") {
+                            saveParams(that);
+                        }
+                        if ((that.active_tab === "function-node-tab-input-params") &&
+                            (tab.id === "function-node-tab-edit-params")) {
+                            loadParams(that);
+                        }
                         if (tab.id === "function-node-tab-input-params") {
-                            setupInputUI();
+                            setupInputUI(that);
+                        }
+                        if ((tab.id === "function-node-tab-edit-code") &&
+                            that.active_tab) {
+                            var code = $("#node-input-func").val();
+                            if (that.editor) {
+                                var val = that.editor.getValue();
+                                if (!that.editor_init) {
+                                    that.editor.setValue(val);
+                                    that.editor.clearSelection();
+                                    that.editor_init = true;
+                                }
+                                that.editor.focus();
+                            }
                         }
                         $("#function-node-tabs-content").children().hide();
                         $("#" + tab.id).show();
                         that.active_tab = tab.id;
-                        console.log("; TAB:", tab.id);
                     }
                 });
                 tabs.addTab({
@@ -283,7 +398,7 @@
             } // setupCodeTab
 
             function setupParamsTab() {
-                function setupContainer(container) {
+                function setupContainer(cont) {
                     var checkboxType = {
                         value: "checkbox",
                         label: "checkbox",
@@ -302,16 +417,16 @@
                         icon: "fa fa-tag",
                         hasValue: false
                     };
-                    container
+                    cont
                         .css("min-height", "250px")
                         .css("min-width", "400px")
                         .editableList({
-                            addItem: function (container, i, opt) {
+                            addItem: function (container0, i, opt) {
                                 function setupMenuItems(row, val, items) {
-                                    var container = $("<ol/>", {
+                                    var menu = $("<ol/>", {
                                         class: "menu-item-list"
                                     }).appendTo(row);
-                                    container
+                                    menu
                                         .css("min-height", "120px")
                                         .editableList({
                                             addItem: function (con, i, opt) {
@@ -333,18 +448,18 @@
                                     if (items) {
                                         for(var i = 0; i < items.length; i++) {
                                             var item = items[i];
-                                            container.editableList("addItem", {
+                                            menu.editableList("addItem", {
                                                 value: item
                                             });
                                         }
                                     }
                                 } // setupMenuItems
 
-                                var row0 = $("<div/>").appendTo(container);
+                                var row0 = $("<div/>").appendTo(container0);
                                 var row1 = $("<div/>", {
                                     class: "menu-selection-list",
                                     style: "width: 60%; min-height: 100px; margin-top: 10px; margin-left: auto; margin-right: 7px;"
-                                }).appendTo(container);
+                                }).appendTo(container0);
                                 var labelField = $("<input/>", {
                                     class: "params-label",
                                     type: "text",
@@ -387,13 +502,13 @@
                         });
                 } // setupContainer
                 
-                var container = $("#params-edit-container");
-                setupContainer(container);
-                container.editableList("empty");
+                var edit_con = $("#params-edit-container");
+                setupContainer(edit_con);
+                edit_con.editableList("empty");
                 var params = that.func_params || [];
                 for (var i = 0; i < params.length; i++) {
                     var param = params[i];
-                    container.editableList("addItem", {
+                    edit_con.editableList("addItem", {
                         label: param.label,
                         type: param.type,
                         value: param.value,
@@ -403,66 +518,17 @@
             } // setupParamsTab
 
             var active_tab = that.active_tab;
+            that.active_tab = undefined;
+            that.editor_init = false;
             var tabs = setupTabs();
             setupCodeTab();
             setupParamsTab();
             if (active_tab) {
-                console.log("; act:", active_tab);
-                //tabs.activateTab(active_tab);
+                tabs.activateTab(active_tab);
             }
         },
         oneditsave: function() {
             var that = this;
-
-            function saveParams() {
-                var params = [];
-                var rules = $("#params-edit-container").editableList("items");
-                rules.each(function (i) {
-                    var label = $(this).find(".params-label").val();
-                    var ti = $(this).find(".params-value");
-                    var type = ti.typedInput("type");
-                    if ((type === "msg") ||
-                        (type === "flow") || (type === "global") ||
-                        (type === "str") || (type === "num") ||
-                        (type === "bool") || (type === "date") ||
-                        (type === "re") || (type === "json") ||
-                        (type === "bin") || (type === "jsonata") ||
-                        (type === "env") ||
-                        (type === "checkbox")
-                       ) {
-                        var value = ti.typedInput("value");
-                        params.push({
-                            index: i, label: label,
-                            type: type, value: value, items: undefined
-                        });
-                    }
-                    else if (type === "menu") {
-                        var value = ti.typedInput("value");
-                        var items = $(this).find(".menu-item-list").editableList("items");
-                        var menu_items = [];
-                        items.each(function (i) {
-                            var item = $(this).find(".menu-item").val();
-                            menu_items.push(item);
-                        });                         
-                        params.push({
-                            index: i, label: label,
-                            type: type, value: value, items: menu_items
-                        });
-                    }
-                    else if (type === "label") {
-                        params.push({
-                            index: i, label: label,
-                            type: type, value: "", items: undefined 
-                        });
-                    }
-                    else {
-                        throw new Error("unexpected field type");
-                    }
-                });
-                console.log("; params:", params);
-                that.func_params = params;
-            } // saveParams
-
             var annot = that.editor.getSession().getAnnotations();
             that.noerr = 0;
             $("#node-input-noerr").val(0);
@@ -474,7 +540,9 @@
                 }
             }
             $("#node-input-func").val(that.editor.getValue());
-            saveParams();
+            if (that.active_tab === "function-node-tab-edit-params") {
+                saveParams(that);
+            }
 
             that.editor.destroy();
             delete that.editor;
@@ -495,4 +563,5 @@
             this.editor.resize();
         }
     });
+})();
 </script>
