@@ -99,6 +99,7 @@
 
 <script type="text/javascript">
 (function () {
+    var _count = 0;
 
     function saveParams(node) {
         var params = [];
@@ -119,7 +120,8 @@
                 var value = ti.typedInput("value");
                 params.push({
                     index: i, label: label,
-                    type: type, value: value, items: undefined
+                    type: type, value: value, items: undefined,
+                    any_type: undefined
                 });
             }
             else if (type === "menu") {
@@ -132,13 +134,32 @@
                 });
                 params.push({
                     index: i, label: label,
-                    type: type, value: value, items: menu_items
+                    type: type, value: value, items: menu_items,
+                    any_type: undefined
+                });
+            }
+            else if (type === "any") {
+                var value = ti.typedInput("value");
+                var types = $(item).find(".type-selector");
+                var selected = [];
+                types.each(function (i, type) {
+                    if($(type).prop("checked")) {
+                        var name = $(type).prop("value");
+                        selected.push(name);
+                    }
+                });
+                var any_type = (selected.length > 0) ? selected[0] : "undef";
+                params.push({
+                    index: i, label: label,
+                    type: "any", value: value, items: selected,
+                    any_type: any_type
                 });
             }
             else if (type === "label") {
                 params.push({
                     index: i, label: label,
-                    type: type, value: "", items: undefined 
+                    type: type, value: "", items: undefined ,
+                    any_type: undefined
                 });
             }
             else {
@@ -209,6 +230,36 @@
                             item.value = new_val;
                         });
                     }
+                    else if (type === "any") {
+                        var undefType = {
+                            value: "undef",
+                            label: "undef",
+                            icon: "fa fa-question",
+                            hasValue: false
+                        };
+                        var any_type = item.any_type;
+                        var items = item.items;
+                        var labelField = $("<label/>", {
+                            style: "width: 25%;"
+                        }).html(label).appendTo(row0);
+                        var types = ((any_type === "undef") ? [undefType] : items);
+                        var valueField = $("<input/>", {
+                            type: "text",
+                            style: "width: 70%;"
+                        })
+                            .appendTo(row0)
+                            .typedInput({
+                                default: any_type,
+                                types: types
+                            });
+                        valueField.typedInput("value", value);
+                        valueField.on("change", function (e, t) {
+                            var new_type = valueField.typedInput("type");
+                            var new_val = valueField.typedInput("value");
+                            item.any_type = new_type;
+                            item.value = new_val;
+                        });
+                    }
                     else if (type === "checkbox") {
                         var padding = $("<label/>", {
                             style: "width: 25%;"
@@ -268,27 +319,17 @@
                     var type = param.type;
                     var value = param.value;
                     var ti = $(rule).find(".params-value");
-                    if ((type === "msg") ||
-                        (type === "flow") || (type === "global") ||
-                        (type === "str") || (type === "num") ||
-                        (type === "bool") || (type === "date") ||
-                        (type === "re") || (type === "json") ||
-                        (type === "bin") || (type === "jsonata") ||
-                        (type === "env")
-                       ) {
-                        ti.typedInput("value", value);
-                    }
-                    else if (type === "checkbox") {
-                        ti.typedInput("value", value);
-                    }
-                    else if (type === "menu") {
-                        ti.typedInput("value", value);
-                    }
-                    else if (type === "label") {
-                        // nothing to do
-                    }
-                    else {
-                        throw new Error("unexpected field type:"+type);
+                    ti.typedInput("value", value);
+                    ti.typedInput("type", type);
+                    if (type === "any") {
+                        var items = param.items;
+                        var selectors = $(rule).find(".type-selector");
+                        selectors.each(function (i, sel) {
+                            var value = $(sel).prop("value");
+                            if (items.indexOf(value) >= 0) {
+                                $(sel).prop("checked", true);
+                            }
+                        });
                     }
                 }
             } // loadParams
@@ -297,11 +338,15 @@
                 var tabs = RED.tabs.create({
                     id: "function-node-tabs",
                     onchange: function(tab) {
+                        $("#function-node-tabs-content").children().hide();
+                        $("#" + tab.id).show();
                         if (that.active_tab === "function-node-tab-edit-params") {
                             saveParams(that);
                         }
                         if ((that.active_tab === "function-node-tab-input-params") &&
                             (tab.id === "function-node-tab-edit-params")) {
+                        }
+                        if (tab.id === "function-node-tab-edit-params") {
                             loadParams(that);
                         }
                         if (tab.id === "function-node-tab-input-params") {
@@ -320,8 +365,6 @@
                                 that.editor.focus();
                             }
                         }
-                        $("#function-node-tabs-content").children().hide();
-                        $("#" + tab.id).show();
                         that.active_tab = tab.id;
                     }
                 });
@@ -399,6 +442,12 @@
 
             function setupParamsTab() {
                 function setupContainer(cont) {
+                    var anyType = {
+                        value: "any",
+                        label: "any",
+                        icon: "fa fa-cog",
+                        hasValue: true
+                    };
                     var checkboxType = {
                         value: "checkbox",
                         label: "checkbox",
@@ -455,11 +504,100 @@
                                     }
                                 } // setupMenuItems
 
+                                function setupTypeSelector(row) {
+                                    var type_map = {
+                                        "msg" : {
+                                            label: "msg."
+                                        },
+                                        "flow" : {
+                                            label: "flow."
+                                        },
+                                        "global" : {
+                                            label: "global."
+                                        },
+                                        "str" : {
+                                            label: "string",
+                                            icon: "red/images/typedInput/az.png"
+                                        },
+                                        "num" : {
+                                            label: "number",
+                                            icon: "red/images/typedInput/09.png"
+                                        },
+                                        "bool" : {
+                                            label: "bool",
+                                            icon: "red/images/typedInput/bool.png"
+                                        },
+                                        "date" : {
+                                            label: "timestamp"
+                                        },
+                                        "re" : {
+                                            label: "reg. exp.",
+                                            icon: "red/images/typedInput/re.png"
+                                        },
+                                        "json" : {
+                                            label: "json",
+                                            icon: "red/images/typedInput/json.png"
+                                        },
+                                        "bin" : {
+                                            label: "buffer",
+                                            icon: "red/images/typedInput/bin.png"
+                                        },
+                                        "jsonata" : {
+                                            label: "jsonata",
+                                            icon: "red/images/typedInput/expr.png"
+                                        },
+                                        "env" : {
+                                            label: "env",
+                                            icon: "red/images/typedInput/env.png"
+                                        }
+                                    };
+                                    var types = Object.keys(type_map);
+                                    var div0 = null;
+                                    var count = 0;
+                                    types.forEach(function (type) {
+                                        if((count % 3) === 0) {
+                                            div0 = $("<div/>", {
+                                                style: "margin-left: 20px;"
+                                            }).appendTo(row);
+                                        }
+                                        var item = type_map[type];
+                                        var label = item.label;
+                                        var icon = item.icon;
+                                        var div1 = $("<div/>", {
+                                            style: "display: inline-block; width: 120px;"
+                                        }).appendTo(div0);
+                                        var div2 = $("<div/>", {
+                                            style: "display: inline-block; width: 40px;"
+                                        }).appendTo(div1);
+                                        $("<input/>", {
+                                            type: "checkbox",
+                                            name: "type",
+                                            value: type,
+                                            class: "type-selector",
+                                            id: type +"_" +_count,
+                                            style: "width: auto; margin-left: 5px; margin-right: 5px;"
+                                        }).appendTo(div2);
+                                        if (icon) {
+                                            $("<img/>", {
+                                                src: icon,
+                                                style: "width: auto; margin-right: 4px; height: 18px;"
+                                            }).appendTo(div2);
+                                        }
+                                        $("<label/>", {
+                                            for: type +"_" +_count,
+                                            style: "width: auto;"
+                                        }).text(label).appendTo(div1);
+                                        count++;
+                                        _count++;
+                                    });
+                                } // setupTypeSelector
+                                
                                 var row0 = $("<div/>").appendTo(container0);
                                 var row1 = $("<div/>", {
                                     class: "menu-selection-list",
                                     style: "width: 60%; min-height: 100px; margin-top: 10px; margin-left: auto; margin-right: 7px;"
                                 }).appendTo(container0);
+                                var row2 = $("<div/>").appendTo(container0);
                                 var labelField = $("<input/>", {
                                     class: "params-label",
                                     type: "text",
@@ -482,16 +620,21 @@
                                                 "json", "bin", "jsonata", "env",
                                                 checkboxType,
                                                 menuType,
-                                                labelType
+                                                labelType,
+                                                anyType
                                                ]
                                     });
                                 if (opt && opt.value) {
                                     valueField.typedInput("value", opt.value);
                                 }
+
                                 setupMenuItems(row1, opt.value, opt.items);
+                                setupTypeSelector(row2);
+
                                 valueField.change(function () {
                                     var type = valueField.typedInput("type");
                                     row1.toggle(type === "menu");
+                                    row2.toggle(type === "any");
                                 });
                                 valueField.change();
                             },
